@@ -15,6 +15,7 @@ import tomllib
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+import tomlkit
 from packaging.markers import InvalidMarker, Marker
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.tags import sys_tags
@@ -24,6 +25,7 @@ from packaging.utils import (
     parse_wheel_filename,
 )
 from packaging.version import InvalidVersion, Version
+from tomlkit.exceptions import TOMLKitError
 
 from .archive import BackupError
 
@@ -390,6 +392,39 @@ def _run(command: list[str], *, timeout: int = 300) -> None:
         )
 
 
+def _expanded_lock(lock: str, home: Path) -> str:
+    """Expand wheel locators with filesystem or URI encoding as appropriate.
+
+    The archive retains the original lock. Only the reconstruction copy changes,
+    keeping dependency identities, hashes and other protected values unchanged.
+    Parsing before substitution also handles TOML literal and escaped strings.
+    """
+    token = "${TOOLFRAME_HOME}"
+    try:
+        document = tomlkit.parse(lock)
+        changed = False
+        for package in document.get("packages", []):
+            choices = (
+                [package["archive"]]
+                if "archive" in package
+                else package.get("wheels", [])
+            )
+            for wheel in choices:
+                if "path" in wheel and token in str(wheel["path"]):
+                    wheel["path"] = str(wheel["path"]).replace(token, str(home))
+                    changed = True
+                elif "url" in wheel and token in str(wheel["url"]):
+                    # Percent-encode the home once; retain existing wheel URL
+                    # escapes so '%' in a real path cannot change their meaning.
+                    wheel["url"] = str(wheel["url"]).replace(
+                        token, urlsplit(home.as_uri()).path
+                    )
+                    changed = True
+        return tomlkit.dumps(document) if changed else lock
+    except TOMLKitError, TypeError, KeyError, ValueError:
+        _fail("invalid_environment_lock", "Environment lock path expansion failed.")
+
+
 def rehydrate(
     home: Path,
     content: list[dict],
@@ -433,7 +468,7 @@ def rehydrate(
         lockfile = target / "pylock.toml"
         fd = os.open(lockfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as output:
-            output.write(lock.replace("${TOOLFRAME_HOME}", str(home)))
+            output.write(_expanded_lock(lock, home))
         _run(
             [
                 executable,

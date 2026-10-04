@@ -36,7 +36,9 @@ and publishes it with the platform's atomic no-replace rename. It holds Core's p
 `application_lock` across publication and reconstructs recorded environments at the
 final absolute path using uv, exact original locks and hash verification. The original
 raw lock remains unchanged in the protected archive; reconstruction expands its
-`${TOOLFRAME_HOME}` token for the final location. Direct wheel `archive.path` records
+`${TOOLFRAME_HOME}` token in wheel locators for the final location, encoding file
+URI paths and retaining filesystem paths as filesystem strings. Dependency identities,
+hashes and protected non-locator values remain unchanged. Direct wheel `archive.path` records
 confined to the recovered home are supported alongside index wheel records.
 Python implementation, OS and machine architecture must match. A recorded version
 with only major/minor requires those components to match; when it includes a patch,

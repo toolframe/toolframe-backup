@@ -30,8 +30,10 @@ files and restored payload files have mode 0600; uv sets reconstructed environme
 file modes. Existing backup directories must already have
 mode 0700. Restore requires a new destination with an existing parent directory;
 it never replaces an existing home, including an empty directory.
-Restore paths may contain spaces, but cannot contain quotes, backslashes or control
-characters because exact lock reconstruction expands paths in the original TOML.
+Supported restore paths include spaces and Unicode. Paths containing quotes,
+backslashes or control characters are rejected before staging.
+File URI wheel locators encode spaces, Unicode and URI delimiters such as `#`, `?`
+and `%`; direct wheel paths retain their filesystem spelling.
 
 To install the catalog in an existing application, declare the plugin and its
 required destination together in `app/toolframe.toml`. The example wheel path is

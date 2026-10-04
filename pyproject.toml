@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.14"
-dependencies = ["toolframe-sdk==0.3.0", "packaging>=25"]
+dependencies = ["toolframe-sdk==0.3.0", "packaging>=25", "tomlkit>=0.13,<1"]
 
 [project.optional-dependencies]
 operator = ["toolframe-core>=0.6,<0.7"]
