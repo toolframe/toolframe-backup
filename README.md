@@ -7,14 +7,14 @@ application cannot start. The ordinary plugin never snapshots a running applicat
 
 ## Quick start
 
-Use Python 3.14 or newer and matching Toolframe SDK/Core wheels. Archive creation
+Use Python 3.14 or newer. Archive creation
 requires a Core release providing `toolframe_core.maintenance.stopped_application`.
 Restoring recorded environments also requires its public `application_lock` helper.
-Install the operator extra from your Toolframe wheel set:
+Install the operator extra from PyPI:
 
 ```sh
 uv venv --python 3.14
-uv pip install --find-links ./wheelhouse 'toolframe-backup[operator]==0.1.0'
+uv pip install 'toolframe-backup[operator]==0.1.0'
 # Stop the application's host and workers cleanly before creating the archive.
 .venv/bin/toolframe-backup create --home ./app --directory ./backups
 .venv/bin/toolframe-backup list --directory ./backups
@@ -123,3 +123,5 @@ Dashboard and client flows separately through an installed application. Package 
 do not establish remote-store or air-gap support.
 
 Licensed under [Apache-2.0](LICENSE).
+
+For release validation and Trusted Publisher setup, see [releasing](docs/releasing.md).
