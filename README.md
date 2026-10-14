@@ -36,13 +36,12 @@ File URI wheel locators encode spaces, Unicode and URI delimiters such as `#`, `
 and `%`; direct wheel paths retain their filesystem spelling.
 
 To install the catalog in an existing application, declare the plugin and its
-required destination together in `app/toolframe.toml`. The example wheel path is
-relative to the application home; replace the destination with your operator-owned
-absolute backup path:
+required destination together in `app/toolframe.toml`. Core resolves the package
+from PyPI; replace the destination with your operator-owned absolute backup path:
 
 ```toml
 [plugins.backup]
-source = "wheel:../wheelhouse/toolframe_backup-0.1.0-py3-none-any.whl"
+source = "pypi:toolframe-backup==0.1.0"
 enabled = true
 
 [plugins.backup.config]
