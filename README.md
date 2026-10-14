@@ -124,3 +124,5 @@ do not establish remote-store or air-gap support.
 Licensed under [Apache-2.0](LICENSE).
 
 For release validation and Trusted Publisher setup, see [releasing](docs/releasing.md).
+
+For development hooks and contribution rules, see [Contributing](CONTRIBUTING.md).
