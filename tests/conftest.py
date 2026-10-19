@@ -28,7 +28,7 @@ def source_home(tmp_path):
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         path.write_bytes(data)
         path.chmod(0o600)
-    database = home / ".toolframe/state/storage-sqlite/notes/data.sqlite"
+    database = home / ".toolframe/state/sql-sqlite/notes/data.sqlite"
     database.parent.mkdir(mode=0o700, parents=True)
     with sqlite3.connect(database) as connection:
         connection.executescript(
@@ -73,9 +73,9 @@ def inventory(source_home):
         "files": files,
         "stores": [
             {
-                "path": ".toolframe/state/storage-sqlite/notes/data.sqlite",
+                "path": ".toolframe/state/sql-sqlite/notes/data.sqlite",
                 "owner": "notes",
-                "provider": "storage-sqlite",
+                "provider": "sql-sqlite",
             }
         ],
         "retained_keys": [
