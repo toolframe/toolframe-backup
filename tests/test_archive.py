@@ -39,7 +39,7 @@ def test_stopped_mock_inventory_roundtrip_preserves_source_and_secrets(
         restored / ".toolframe/keys/auth/signing"
     ).read_bytes() == b"PRIVATE-RECOVERY-KEY-DO-NOT-PRINT"
     with sqlite3.connect(
-        restored / ".toolframe/state/storage-sqlite/notes/data.sqlite"
+        restored / ".toolframe/state/sql-sqlite/notes/data.sqlite"
     ) as db:
         assert db.execute("SELECT label FROM notes").fetchone() == (
             "preserve this row",
