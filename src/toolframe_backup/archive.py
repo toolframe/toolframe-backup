@@ -252,6 +252,7 @@ def _validate_inventory(inventory: dict, entries: list, limits: Limits) -> None:
         if not isinstance(lock["purpose"], str) or lock["purpose"] not in {
             "backend",
             "ui",
+            "web",
         }:
             _fail()
         _text(lock["candidate_id"])

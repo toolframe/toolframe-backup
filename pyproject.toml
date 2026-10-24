@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "toolframe-backup"
-version = "0.2.0"
+version = "0.2.1"
 description = "Stopped-application recovery archives and a local Backup catalog for Toolframe"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "byfb", email = "62798989+byfb@users.noreply.github.com" }]
 requires-python = ">=3.14"
-dependencies = ["toolframe-sdk==0.4.0", "packaging>=25", "tomlkit>=0.13,<1"]
+dependencies = ["toolframe-sdk>=0.4,<0.5", "packaging>=25", "tomlkit>=0.13,<1"]
 
 [project.urls]
 Homepage = "https://github.com/toolframe/toolframe-backup"
@@ -20,7 +20,7 @@ Documentation = "https://github.com/toolframe/toolframe-backup#readme"
 Issues = "https://github.com/toolframe/toolframe-backup/issues"
 
 [project.optional-dependencies]
-operator = ["toolframe-core>=0.7,<0.8"]
+operator = ["toolframe-core>=0.7,<0.9"]
 ui = ["streamlit==1.61.0"]
 
 [project.scripts]
@@ -30,7 +30,7 @@ toolframe-backup = "toolframe_backup.cli:main"
 backup = "toolframe_backup.plugin:plugin"
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.12,<1", "hatchling>=1.27,<2"]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.12,<1", "hatchling>=1.27,<2", "streamlit==1.61.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/toolframe_backup"]
