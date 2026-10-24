@@ -10,11 +10,13 @@ application cannot start. The ordinary plugin never snapshots a running applicat
 Use Python 3.14 or newer. Archive creation
 requires a Core release providing `toolframe_core.maintenance.stopped_application`.
 Restoring recorded environments also requires its public `application_lock` helper.
-Install the operator extra from PyPI:
+Web application recovery requires Core 0.8 or newer and Backup 0.2.1 or newer.
+Sealed Web assets are retained with the application; recovery does not run an asset
+compiler or fetch browser libraries. Install the operator extra from PyPI:
 
 ```sh
 uv venv --python 3.14
-uv pip install 'toolframe-backup[operator]==0.2.0'
+uv pip install 'toolframe-backup[operator]==0.2.1'
 # Stop the application's host and workers cleanly before creating the archive.
 .venv/bin/toolframe-backup create --home ./app --directory ./backups
 .venv/bin/toolframe-backup list --directory ./backups
@@ -41,7 +43,7 @@ from PyPI; replace the destination with your operator-owned absolute backup path
 
 ```toml
 [plugins.backup]
-source = "pypi:toolframe-backup==0.2.0"
+source = "pypi:toolframe-backup==0.2.1"
 enabled = true
 
 [plugins.backup.config]
@@ -73,7 +75,7 @@ verification records and explicit retention workflow.
 - SHA-256 checks detect corruption. They are not signatures and do not authenticate
   an archive against an attacker who can replace both payload and manifest.
 - Offline means the source host is stopped and the CLI needs no running application.
-  Restore reconstructs omitted backend/UI environments with uv from protected original
+  Restore reconstructs omitted backend/UI/Web environments with uv from protected original
   exact pylocks before reporting `ready: true`. It uses the final absolute directory
   under Core's public application lock so console-script shebangs remain valid. Missing
   dependency wheels require exact-hash wheels from a supplied wheelhouse or network;

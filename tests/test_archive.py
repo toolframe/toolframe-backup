@@ -20,9 +20,12 @@ def contents(home):
     }
 
 
+@pytest.mark.parametrize("purpose", ["backend", "ui", "web"])
 def test_stopped_mock_inventory_roundtrip_preserves_source_and_secrets(
-    backup_factory, source_home, tmp_path
+    backup_factory, source_home, tmp_path, inventory, purpose
 ):
+    inventory.as_dict()["environment_locks"][0]["purpose"] = purpose
+    inventory.environment_locks[0].purpose = purpose
     before = contents(source_home)
     path = backup_factory()
     result = archive.verify_backup(path)
@@ -30,6 +33,7 @@ def test_stopped_mock_inventory_roundtrip_preserves_source_and_secrets(
     assert result.manifest["inventory"]["application_id"] == "app-recovery-test"
     assert result.manifest["inventory"]["dependency_wheels"][0]["path"] is None
     assert len(result.manifest["inventory"]["environment_locks"][0]["sha256"]) == 64
+    assert result.manifest["inventory"]["environment_locks"][0]["purpose"] == purpose
     assert "PRIVATE-RECOVERY" not in json.dumps(result.manifest)
     assert "secret:password" not in json.dumps(result.manifest)
     restored = tmp_path / "recovery"
