@@ -58,3 +58,23 @@ catalog can be regenerated after restart without writing a source-side offline c
 Retention is an explicit operator action: preview a bounded deletion set, then apply
 the current preview after rechecking archive identity/content. Unknown or invalid files
 are preserved. No running service accepts an arbitrary filesystem path from a client.
+
+
+Runtime catalog calls own their executor work until it has stopped, including when
+an async caller is cancelled repeatedly. Each call propagates its host-issued
+`RuntimeContext.call_info` deadline to a monotonic cooperative operation. Lock
+waiters check cancellation at most every 50 ms of lock waiting; directory entries,
+archive candidates, ZIP members and checksum chunks provide additional safe
+boundaries. Cancellation is control flow, not a rejected or corrupt archive.
+Synchronous catalog and operator CLI APIs retain their existing signatures and
+have no cancellation scope by default.
+
+Retention can stop during scanning or staged verification. Before deletion begins,
+interruption restores moved archives through the existing exclusive-link recovery
+path. Once the verified deletion set enters its unlink phase, cancellation waits
+for deletion or recovery to finish. A cancelled response can therefore accompany
+completed retention; inspect the catalog and obtain a new preview before retrying.
+Disposal rejects new work, signals all owned operations, waits for their threads,
+and then closes the SDK runtime context. Cancellation is cooperative: an individual
+filesystem call, bounded metadata parse, deletion commit or recovery step must
+return before cleanup can finish; it does not forcibly terminate a thread.

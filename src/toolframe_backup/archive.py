@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from .operation import checkpoint
+
 FORMAT = "toolframe-backup"
 FORMAT_VERSION = 1
 BACKUP_ID = re.compile(r"[0-9a-f]{32}\Z")
@@ -300,6 +302,7 @@ def _validate_manifest(manifest: Any, limits: Limits) -> dict:
     paths = set()
     total = 0
     for entry in _list(manifest["entries"], limits):
+        checkpoint()
         _object(
             entry,
             {"path", "role", "size", "mode", "sha256", "source_sha256", "snapshot"},
@@ -348,12 +351,14 @@ def _unique_json(pairs):
 
 
 def _inspect(archive: zipfile.ZipFile, limits: Limits) -> dict:
+    checkpoint()
     members = archive.infolist()
     if len(members) > limits.max_files + 2:
         _fail("limit_exceeded", "Backup contains too many archive members.")
     names = set()
     total = 0
     for member in members:
+        checkpoint()
         name = safe_path(member.orig_filename)
         if name != member.filename:
             _fail("unsafe_path", "Backup contains a truncated archive path.")
@@ -413,12 +418,14 @@ def _inspect(archive: zipfile.ZipFile, limits: Limits) -> dict:
             )
         validate(raw, manifest["inventory"]["environment_locks"])
     for entry in manifest["entries"]:
+        checkpoint()
         member = archive.getinfo("payload/" + entry["path"])
         if member.file_size != entry["size"]:
             _fail("checksum_mismatch", "Backup payload size disagrees with manifest.")
         digest, size = hashlib.sha256(), 0
         with archive.open(member) as source:
             while data := source.read(CHUNK):
+                checkpoint()
                 size += len(data)
                 if size > entry["size"]:
                     _fail("limit_exceeded", "Backup payload exceeds declared size.")
@@ -467,6 +474,7 @@ def _open_verified(path: Path, limits: Limits):
                 )
             digest, count = hashlib.sha256(), 0
             while data := stream.read(CHUNK):
+                checkpoint()
                 count += len(data)
                 if count > limits.max_archive_bytes:
                     _fail(
@@ -477,6 +485,7 @@ def _open_verified(path: Path, limits: Limits):
             stream.seek(0)
             archive = resources.enter_context(zipfile.ZipFile(stream))
             manifest = _inspect(archive, limits)
+            checkpoint()
             after = os.fstat(stream.fileno())
             if (metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns) != (
                 after.st_size,

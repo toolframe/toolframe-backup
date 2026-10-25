@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .archive import BackupError, verify_backup
+from .operation import OperationStopped, catalog_lock, checkpoint, operation_scope
 
 MAX_CANDIDATES = 1000
 MAX_DIRECTORY_ENTRIES = 10_000
@@ -125,6 +126,7 @@ class BackupCatalog:
         """Reject symlink components without resolving them into a different directory."""
         current = Path(self.destination.anchor)
         for part in self.destination.parts[1:]:
+            checkpoint()
             current /= part
             try:
                 value = current.lstat()
@@ -164,6 +166,7 @@ class BackupCatalog:
         try:
             with os.scandir(self.destination) as iterator:
                 for entry in iterator:
+                    checkpoint()
                     entries += 1
                     if entries > MAX_DIRECTORY_ENTRIES:
                         raise _error(
@@ -206,7 +209,9 @@ class BackupCatalog:
                 "backup_permissions",
                 "Archive must be an operator-owned regular file with permissions 0600.",
             )
+        checkpoint()
         verified = verify_backup(self.destination / name)
+        checkpoint()
         summary = verified.summary()
         if name != f"backup-{summary['id']}.zip":
             raise _error(
@@ -233,6 +238,7 @@ class BackupCatalog:
         stamps: dict[str, tuple[int, ...]] = {}
         fingerprint: list[Any] = [directory_stamp]
         for name, value in entries:
+            checkpoint()
             backup_id = _BACKUP_NAME.fullmatch(name).group(1)
             stamps[backup_id] = _stamp(value)
             try:
@@ -270,7 +276,7 @@ class BackupCatalog:
         self, limit: int = 50, *, application_id: str | None = None
     ) -> dict[str, Any]:
         limit = bounded_integer(limit, "limit", 100)
-        with self._lock:
+        with catalog_lock(self._lock):
             scan = self._scan()
             eligible = [
                 item
@@ -297,7 +303,7 @@ class BackupCatalog:
         self, backup_id: str, *, application_id: str | None = None
     ) -> dict[str, Any]:
         backup_id = validate_backup_id(backup_id)
-        with self._lock:
+        with catalog_lock(self._lock):
             self._directory()
             name = f"backup-{backup_id}.zip"
             try:
@@ -330,7 +336,7 @@ class BackupCatalog:
                 "backup_identity_missing",
                 "Retention requires a host-issued application identity.",
             )
-        with self._lock:
+        with catalog_lock(self._lock):
             scan = self._scan()
             eligible = [
                 item
@@ -375,7 +381,7 @@ class BackupCatalog:
             raise _error(
                 "backup_validation", "plan_token must be a retention preview token."
             )
-        with self._lock:
+        with catalog_lock(self._lock):
             plan = self._plans.pop(plan_token, None)
             if plan is None or plan.expires <= time.monotonic():
                 raise _error(
@@ -395,6 +401,7 @@ class BackupCatalog:
                 )
             if not plan.delete:
                 return {"deleted_ids": [], "deleted_count": 0}
+            checkpoint()
             return self._delete_verified(plan, scan)
 
     def _delete_verified(self, plan: _Plan, scan: _Scan) -> dict[str, Any]:
@@ -421,6 +428,7 @@ class BackupCatalog:
             os.mkdir(staging_name, mode=0o700, dir_fd=directory_fd)
             staging_fd = os.open(staging_name, flags, dir_fd=directory_fd)
             for item in plan.delete:
+                checkpoint()
                 name = f"backup-{item['id']}.zip"
                 value = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
                 if _stamp(value) != scan.stamps[item["id"]]:
@@ -448,17 +456,20 @@ class BackupCatalog:
                 staged_stamps[name] = _stamp(current)
             # All staged archives passed the same verification as the preview.
             # Unknown entries and rejected archives are never moved or removed.
-            for name in moved[:]:
-                current = os.stat(name, dir_fd=staging_fd, follow_symlinks=False)
-                if _stamp(current) != staged_stamps[name]:
-                    raise _error(
-                        "backup_retention_stale",
-                        "Backup changed after verification. Preview retention again.",
-                    )
-                os.unlink(name, dir_fd=staging_fd)
-                moved.remove(name)
-                deleted.append(_BACKUP_NAME.fullmatch(name).group(1))
-        except (OSError, BackupError) as error:
+            checkpoint()
+            # Commit the verified deletion set without cancellation between unlinks.
+            with operation_scope(None):
+                for name in moved[:]:
+                    current = os.stat(name, dir_fd=staging_fd, follow_symlinks=False)
+                    if _stamp(current) != staged_stamps[name]:
+                        raise _error(
+                            "backup_retention_stale",
+                            "Backup changed after verification. Preview retention again.",
+                        )
+                    os.unlink(name, dir_fd=staging_fd)
+                    moved.remove(name)
+                    deleted.append(_BACKUP_NAME.fullmatch(name).group(1))
+        except (OSError, BackupError, OperationStopped) as error:
             recovery_failed = False
             for name in moved[:]:
                 try:
@@ -480,7 +491,7 @@ class BackupCatalog:
                     "backup_retention_recovery",
                     "Retention stopped. Preserved archives remain in a protected .backup-retention directory for operator recovery.",
                 ) from None
-            if isinstance(error, BackupError):
+            if isinstance(error, (BackupError, OperationStopped)):
                 raise
             raise _error(
                 "backup_retention_failed",
