@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 from toolframe_sdk import Plugin, PluginError
 
 from .archive import BackupError
 from .catalog import BackupCatalog
+from .operation import Operation, OperationStopped, checkpoint, operation_scope
 
 SERVICE_NAME = "backup.catalog"
 _PARAMETERS = {
@@ -25,10 +27,13 @@ class BackupPlugin(Plugin):
     def __init__(self, context):
         super().__init__(context)
         self.catalog: BackupCatalog | None = None
+        self._workers: dict[asyncio.Task, Operation] = {}
+        self._disposed = False
+        self._disposal: asyncio.Task | None = None
 
     async def activate(self):
         try:
-            self.catalog = await asyncio.to_thread(
+            self.catalog = await self._run(
                 BackupCatalog,
                 self.context.config.get("destination"),
                 retention_keep=self.context.config.get("retention_keep", 10),
@@ -47,11 +52,67 @@ class BackupPlugin(Plugin):
         value = self.context.call_info.get("application_id")
         return value if isinstance(value, str) and value else None
 
+    @staticmethod
+    async def _settle(task):
+        """Keep ownership through repeated cancellation until the thread exits."""
+        settled = asyncio.gather(task, return_exceptions=True)
+        while not settled.done():
+            try:
+                await asyncio.shield(settled)
+            except asyncio.CancelledError:
+                continue
+        settled.result()  # Retrieve failures even when the caller was cancelled.
+
     async def _run(self, function, *args, **kwargs):
+        if self._disposed:
+            raise PluginError("backup_not_ready", "Backup catalog has been disposed.")
+        deadline = self.context.call_info.get("deadline")
+        operation = Operation(
+            time.monotonic() + max(0, deadline - time.time())
+            if deadline is not None
+            else None
+        )
+
+        def run():
+            with operation_scope(operation):
+                result = function(*args, **kwargs)
+                checkpoint()
+                return result
+
+        worker = asyncio.create_task(asyncio.to_thread(run))
+        self._workers[worker] = operation
         try:
-            return await asyncio.to_thread(function, *args, **kwargs)
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            operation.cancelled.set()
+            await self._settle(worker)
+            raise
+        except OperationStopped:
+            if operation.cancelled.is_set():
+                raise asyncio.CancelledError from None
+            raise PluginError("deadline_exceeded", "Call deadline exceeded") from None
         except BackupError as error:
             raise PluginError(error.code, error.message) from None
+        finally:
+            self._workers.pop(worker, None)
+
+    async def dispose(self):
+        self._disposed = True
+        if self._disposal is None:
+            for operation in self._workers.values():
+                operation.cancelled.set()
+
+            async def finish():
+                await asyncio.gather(*tuple(self._workers), return_exceptions=True)
+                self.catalog = None
+                await super(BackupPlugin, self).dispose()
+
+            self._disposal = asyncio.create_task(finish())
+        try:
+            await asyncio.shield(self._disposal)
+        except asyncio.CancelledError:
+            await self._settle(self._disposal)
+            raise
 
     async def list_backups(self, limit: int = 50) -> dict[str, Any]:
         return await self._run(
