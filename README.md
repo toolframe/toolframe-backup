@@ -128,3 +128,12 @@ Licensed under [Apache-2.0](LICENSE).
 For release validation and Trusted Publisher setup, see [releasing](docs/releasing.md).
 
 For development hooks and contribution rules, see [Contributing](CONTRIBUTING.md).
+
+Plugin dependencies allow compatible SDK 0.x updates from the declared minimum.
+See the [SDK compatibility policy](https://github.com/toolframe/toolframe-sdk/blob/main/docs/compatibility.md) for API guarantees and minimum/latest verification.
+
+The compatibility workflow tests the same wheel with the minimum and newest
+supported SDK. Its separate operator checks exercise Core 0.7.0 and the newest
+supported Core through the public CLI: a running application refuses backup,
+while a cleanly stopped application can be backed up, verified, restored and
+restarted. These checks also run before package publication.
