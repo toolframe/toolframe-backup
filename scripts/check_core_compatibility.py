@@ -69,7 +69,12 @@ def main():
                         f"http://127.0.0.1:{port}/_toolframe/v1/status", timeout=1
                     ) as response:
                         assert response.status == 200
-                        return process, log
+                        status = json.load(response)
+                        if status["ready"] and not any(
+                            operation["status"] in {"queued", "running"}
+                            for operation in status["operations"]
+                        ):
+                            return process, log
                 except urllib.error.URLError, TimeoutError:
                     time.sleep(0.1)
             raise TimeoutError("Core startup")
@@ -101,6 +106,11 @@ def main():
         assert refused["error"] == "maintenance_refused"
     finally:
         stop(process, log)
+    # Surface Core's public error code if platform-specific shutdown proof fails.
+    from toolframe_core.maintenance import stopped_application
+
+    with stopped_application(home) as inventory:
+        assert inventory.status == "STOPPED"
     config = (home / "toolframe.toml").read_bytes()
     created = command(
         "toolframe_backup.cli",
