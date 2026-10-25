@@ -16,7 +16,7 @@ compiler or fetch browser libraries. Install the operator extra from PyPI:
 
 ```sh
 uv venv --python 3.14
-uv pip install 'toolframe-backup[operator]==0.2.1'
+uv pip install 'toolframe-backup[operator]==0.2.2'
 # Stop the application's host and workers cleanly before creating the archive.
 .venv/bin/toolframe-backup create --home ./app --directory ./backups
 .venv/bin/toolframe-backup list --directory ./backups
@@ -43,7 +43,7 @@ from PyPI; replace the destination with your operator-owned absolute backup path
 
 ```toml
 [plugins.backup]
-source = "pypi:toolframe-backup==0.2.1"
+source = "pypi:toolframe-backup==0.2.2"
 enabled = true
 
 [plugins.backup.config]
